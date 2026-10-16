@@ -81,12 +81,44 @@ def update_reader(reader_id, **fields):
 
 
 def delete_reader(reader_id):
-    """Удаляет читателя по ID."""
+    """
+    Удаляет читателя по ID с проверками.
+
+    Не позволяет удалить читателя, у которого есть активные (невозвращённые)
+    книги. Возвращает True при успешном удалении, False — если читатель
+    не найден или у него есть активные выдачи.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # 1. Проверяем, что читатель существует
+        cursor.execute("SELECT last_name, first_name FROM readers WHERE id = ?",
+                       (reader_id,))
+        reader = cursor.fetchone()
+        if not reader:
+            print(f"Читатель с ID {reader_id} не найден.")
+            return False
+
+        # 2. Проверяем, нет ли активных выдач
+        cursor.execute(
+            "SELECT COUNT(*) FROM issues "
+            "WHERE reader_id = ? AND return_date IS NULL",
+            (reader_id,)
+        )
+        active_count = cursor.fetchone()[0]
+        if active_count > 0:
+            print(f"Нельзя удалить читателя {reader['last_name']} "
+                  f"{reader['first_name']}: у него {active_count} активных выдач.")
+            return False
+
+        # 3. Удаляем
         cursor.execute("DELETE FROM readers WHERE id = ?", (reader_id,))
         conn.commit()
-        return cursor.rowcount > 0
+        print(f"Читатель {reader['last_name']} {reader['first_name']} удалён.")
+        return True
+
+    except sqlite3.IntegrityError as e:
+        print(f"Ошибка целостности БД: {e}")
+        return False
     finally:
         conn.close()
