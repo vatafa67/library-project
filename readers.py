@@ -27,17 +27,33 @@ def get_reader_by_id(reader_id):
 
 
 def add_reader(last_name, first_name, student_card, group_name=None, phone=None):
-    """Добавляет нового читателя."""
+    """
+    Добавляет нового читателя.
+
+    Валидирует обязательные поля (ФИО и номер студенческого билета)
+    и возвращает ID созданной записи. При ошибке возвращает None.
+    """
+    # Валидация обязательных полей
+    if not last_name or not last_name.strip():
+        raise ValueError("Фамилия не может быть пустой")
+    if not first_name or not first_name.strip():
+        raise ValueError("Имя не может быть пустым")
+    if not student_card or not student_card.strip():
+        raise ValueError("Номер студенческого билета обязателен")
+
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
             "INSERT INTO readers (last_name, first_name, student_card, group_name, phone) "
             "VALUES (?, ?, ?, ?, ?)",
-            (last_name, first_name, student_card, group_name, phone)
+            (last_name.strip(), first_name.strip(), student_card.strip(),
+             group_name, phone)
         )
         conn.commit()
-        return cursor.lastrowid
+        new_id = cursor.lastrowid
+        print(f"Читатель '{last_name} {first_name}' добавлен (ID={new_id})")
+        return new_id
     except sqlite3.IntegrityError:
         print(f"Читатель с билетом {student_card} уже существует")
         return None
